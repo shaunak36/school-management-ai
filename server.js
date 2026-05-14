@@ -1,0 +1,143 @@
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+
+const express = require('express');
+const cors = require('cors');
+const Groq = require('groq-sdk');
+
+console.log('API Key loaded:', process.env.GROQ_API_KEY ? 'YES' : 'NO - CHECK YOUR .ENV FILE');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// ─── FAKE school data (replace with real DB later) ────────────────────────────
+// When FS team is ready, they will give you API endpoints to fetch this data.
+// For now, use this hardcoded data so your chatbot works TODAY.
+
+const fakeStudentData = {
+  "STU001": {
+    name: "Rahul Sharma",
+    grade: "10",
+    attendance: 78,          // percentage
+    fees: { paid: false, due: 4500, dueDate: "2026-06-01" },
+    upcomingExams: [
+      { subject: "Mathematics", date: "2026-05-20", time: "10:00 AM" },
+      { subject: "Science",     date: "2026-05-22", time: "11:00 AM" }
+    ],
+    assignments: [
+      { subject: "English", title: "Essay on AI", deadline: "2026-05-16", submitted: false },
+      { subject: "Science", title: "Lab Report",  deadline: "2026-05-18", submitted: true  }
+    ],
+    timetable: {
+      Monday:    ["Math", "English", "Science", "PE"],
+      Tuesday:   ["Hindi", "Math", "History", "Art"],
+      Wednesday: ["Science", "English", "Math", "Music"]
+    },
+    studyMaterials: [
+      { subject: "Mathematics", link: "https://school.edu/materials/math-grade10.pdf" },
+      { subject: "Science",     link: "https://school.edu/materials/science-grade10.pdf" }
+    ]
+  }
+};
+
+const fakeClassData = {
+  lowAttendance: [
+    { name: "Priya Patel",  id: "STU002", attendance: 62 },
+    { name: "Amit Verma",   id: "STU003", attendance: 55 },
+    { name: "Sneha Rao",    id: "STU004", attendance: 70 }
+  ],
+  pendingAssignments: [
+    { student: "Rahul Sharma", subject: "English", title: "Essay on AI",   deadline: "2026-05-16" },
+    { student: "Priya Patel",  subject: "Math",    title: "Problem Set 5", deadline: "2026-05-17" }
+  ]
+};
+
+// ─── THE MAIN CHAT ENDPOINT ───────────────────────────────────────────────────
+// Full Stack team will call: POST /api/chat
+// They send: { message: "...", role: "student/teacher/parent", userId: "STU001" }
+// You return: { reply: "..." }
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, role, userId } = req.body;
+
+    // 1. Get relevant school data based on who is asking
+    let schoolContext = '';
+
+    if (role === 'student' && userId && fakeStudentData[userId]) {
+      const student = fakeStudentData[userId];
+      schoolContext = `
+        Student Name: ${student.name}
+        Grade: ${student.grade}
+        Attendance: ${student.attendance}%
+        Fee Due: ₹${student.fees.due} (Due on ${student.fees.dueDate}, Paid: ${student.fees.paid})
+        Upcoming Exams: ${JSON.stringify(student.upcomingExams)}
+        Assignments: ${JSON.stringify(student.assignments)}
+        Today's Timetable (Monday): ${student.timetable.Monday.join(', ')}
+        Study Material Links: ${JSON.stringify(student.studyMaterials)}
+      `;
+    }
+
+    if (role === 'teacher') {
+      schoolContext = `
+        Low Attendance Students: ${JSON.stringify(fakeClassData.lowAttendance)}
+        Pending Assignments: ${JSON.stringify(fakeClassData.pendingAssignments)}
+      `;
+    }
+
+    if (role === 'parent' && userId && fakeStudentData[userId]) {
+      const student = fakeStudentData[userId];
+      schoolContext = `
+        Child Name: ${student.name}
+        Attendance: ${student.attendance}%
+        Fee Status: ${student.fees.paid ? 'Paid' : `Due ₹${student.fees.due} by ${student.fees.dueDate}`}
+        Upcoming Exams: ${JSON.stringify(student.upcomingExams)}
+      `;
+    }
+
+    // 2. Build the prompt — this tells Gemini how to behave
+    const systemPrompt = `
+      You are a helpful school assistant chatbot for a school management system.
+      You help ${role}s with school-related queries only.
+      
+      Here is the current data for this user:
+      ${schoolContext}
+      
+      Rules:
+      - Only answer school-related questions
+      - Be friendly and concise (2-3 sentences max)
+      - If data is available, use it directly in your answer
+      - If asked something you don't have data for, say: "I don't have that info right now, please check with your school"
+      - Respond in the same language the user types in (English/Hindi/Marathi)
+    `;
+
+    // 3. Call Gemini AI
+    const result = await groq.chat.completions.create({
+  model: 'llama-3.3-70b-versatile',
+  messages: [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: message }
+  ]
+});
+const reply = result.choices[0].message.content;
+
+    // 4. Send reply back
+    res.json({ success: true, reply });
+
+} catch (error) {
+    console.error('FULL ERROR:', error);
+    res.status(500).json({ success: false, reply: error.message });
+  }
+});
+
+// ─── QUICK TEST ENDPOINT (open in browser to check server is running) ─────────
+app.get('/', (req, res) => {
+  res.send('School Chatbot API is running! Use POST /api/chat to chat.');
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Chatbot server running at http://localhost:${PORT}`);
+});
