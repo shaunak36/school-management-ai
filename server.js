@@ -159,6 +159,57 @@ app.post('/api/generate-paper', async (req, res) => {
     res.status(500).json({ success: false, reply: error.message });
   }
 });
+// ── GRADING ENDPOINT (Aayush Patil) ──────────────────────────────────────────
+const fakeExamData = {
+  EXAM001: {
+    subject: "Mathematics",
+    questions: [
+      { id: 1, question: "What is 2+2?", correctAnswer: "4", marks: 2 },
+      { id: 2, question: "What is 10x5?", correctAnswer: "50", marks: 2 },
+      { id: 3, question: "What is square root of 144?", correctAnswer: "12", marks: 3 }
+    ],
+    totalMarks: 7
+  }
+};
+
+app.post('/api/grade', async (req, res) => {
+  try {
+    const { examId, studentId, studentAnswers } = req.body;
+    const exam = fakeExamData[examId];
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+    const gradingPrompt = `
+You are a school exam grader.
+Subject: ${exam.subject}
+Questions and Correct Answers:
+${exam.questions.map(q => `Q${q.id}: ${q.question}\nCorrect Answer: ${q.correctAnswer}\nMarks: ${q.marks}`).join('\n\n')}
+Student Answers:
+${exam.questions.map(q => `Q${q.id}: ${studentAnswers[q.id] || 'Not Attempted'}`).join('\n\n')}
+Return ONLY valid JSON:
+{
+  "results": [{"questionId": 1, "correct": true, "marksAwarded": 2, "feedback": "Correct answer"}],
+  "totalMarksAwarded": 5,
+  "totalMarks": 7,
+  "percentage": 71,
+  "grade": "B"
+}`;
+
+    const result = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'You are a school exam grader. Return only valid JSON.' },
+        { role: 'user', content: gradingPrompt }
+      ]
+    });
+
+    const reply = result.choices[0].message.content;
+    const gradingResult = JSON.parse(reply.replace(/```json|```/g, '').trim());
+    res.json({ success: true, examId, studentId, ...gradingResult });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 app.listen(PORT, () => {
   console.log(`✅ Chatbot server running at http://localhost:${PORT}`);
 });
