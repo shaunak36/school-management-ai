@@ -138,6 +138,27 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+// Question Paper Generator endpoint
+app.post('/api/generate-paper', async (req, res) => {
+  try {
+    const { subject, grade, totalQuestions, difficulty, topics } = req.body;
+
+    const result = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'You are a school exam paper generator. Always respond with valid JSON only, no extra text.' },
+        { role: 'user', content: `Generate a ${difficulty} difficulty ${subject} exam for Grade ${grade} with ${totalQuestions} questions covering: ${topics.join(', ')}. Return JSON with title, subject, grade, totalMarks, duration, and sections array with MCQ and short answer questions.` }
+      ]
+    });
+
+    const reply = result.choices[0].message.content;
+    const paper = JSON.parse(reply.replace(/```json|```/g, '').trim());
+    res.json({ success: true, paper });
+
+  } catch (error) {
+    res.status(500).json({ success: false, reply: error.message });
+  }
+});
 app.listen(PORT, () => {
   console.log(`✅ Chatbot server running at http://localhost:${PORT}`);
 });
