@@ -249,6 +249,27 @@ app.post('/api/learning/progress', async (req, res) => {
     res.status(500).json({ error: "Failed to analyze progress." });
   }
 });
+// ── ATTENDANCE ANALYTICS ─────────────────────────────────────────────────────
+app.post('/api/attendance/analyze', async (req, res) => {
+  try {
+    const { studentId, studentName, records } = req.body;
+
+    const result = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'You are a school attendance analyzer. Return ONLY valid JSON no markdown. Schema: {"riskLevel":"low/medium/high","attendancePercentage":"<number>","pattern":"<pattern description>","consecutiveAbsences":"<number>","alert":true/false,"suggestions":["<suggestion>"],"message":"<summary>"}' },
+        { role: 'user', content: `Student: ${studentName}, ID: ${studentId}, Attendance Records: ${JSON.stringify(records)}` }
+      ]
+    });
+
+    const raw = result.choices[0].message.content.replace(/```json|```/g, '').trim();
+    const analysis = JSON.parse(raw);
+    res.json({ success: true, studentId, studentName, ...analysis });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 app.listen(PORT, () => {
   console.log(`✅ Chatbot server running at http://localhost:${PORT}`);
 });
