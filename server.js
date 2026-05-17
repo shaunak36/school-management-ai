@@ -195,99 +195,56 @@ Return ONLY valid JSON:
     res.status(500).json({ success: false, message: error.message });
   }
 });
-// ── PERSONALIZED LEARNING ENDPOINTS (Team Member) ──────────────────────────
-
-// Study Plan Generator
-app.post('/api/study-plan', async (req, res) => {
+// ── PERSONALIZED LEARNING (Aayush Patil - Module 2) ──────────────────────────
+app.post('/api/learning/study-plan', async (req, res) => {
   const { studentName = "Student", subject, weakTopics, grade = "10" } = req.body;
-  
-  if (!subject || !weakTopics) {
-    return res.status(400).json({ error: "subject and weakTopics are required." });
-  }
-  
+  if (!subject || !weakTopics) return res.status(400).json({ error: "subject and weakTopics are required." });
   try {
     const result = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
-        { 
-          role: "system", 
-          content: `You are a personalized learning assistant. Create a 7-day study plan and return ONLY valid JSON no markdown. Schema: {"studentName":"<name>","subject":"<subject>","weeklyPlan":[{"day":"<day>","topic":"<topic>","tasks":["<task>"],"duration":"<time>"}],"tips":["<tip>"],"resources":["<resource>"]}` 
-        },
-        { 
-          role: "user", 
-          content: `Student: ${studentName}, Grade: ${grade}, Subject: ${subject}, Weak Topics: ${weakTopics}` 
-        }
+        { role: "system", content: `You are a personalized learning assistant. Create a 7-day study plan and return ONLY valid JSON no markdown. Schema: {"studentName":"<name>","subject":"<subject>","weeklyPlan":[{"day":"<day>","topic":"<topic>","tasks":["<task>"],"duration":"<time>"}],"tips":["<tip>"],"resources":["<resource>"]}` },
+        { role: "user", content: `Student: ${studentName}, Grade: ${grade}, Subject: ${subject}, Weak Topics: ${weakTopics}` }
       ]
     });
-    
     const raw = result.choices[0].message.content.replace(/```json|```/g, "").trim();
-    const plan = JSON.parse(raw);
-    res.json({ success: true, ...plan });
-    
+    res.json({ success: true, ...JSON.parse(raw) });
   } catch (e) {
     res.status(500).json({ error: "Failed to generate study plan." });
   }
 });
 
-// Learning Resource Recommender
-app.post('/api/recommend', async (req, res) => {
+app.post('/api/learning/recommend', async (req, res) => {
   const { subject, topic, learningStyle = "visual" } = req.body;
-  
-  if (!subject || !topic) {
-    return res.status(400).json({ error: "subject and topic are required." });
-  }
-  
+  if (!subject || !topic) return res.status(400).json({ error: "subject and topic are required." });
   try {
     const result = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
-        { 
-          role: "system", 
-          content: `You are a learning resource recommender. Return ONLY valid JSON no markdown. Schema: {"topic":"<topic>","resources":[{"type":"<video/article/exercise>","title":"<title>","description":"<desc>","difficulty":"<easy/medium/hard>"}],"practiceQuestions":["<question>"],"estimatedTime":"<time>"}` 
-        },
-        { 
-          role: "user", 
-          content: `Subject: ${subject}, Topic: ${topic}, Learning Style: ${learningStyle}` 
-        }
+        { role: "system", content: `You are a learning resource recommender. Return ONLY valid JSON no markdown. Schema: {"topic":"<topic>","resources":[{"type":"<video/article/exercise>","title":"<title>","description":"<desc>","difficulty":"<easy/medium/hard>"}],"practiceQuestions":["<question>"],"estimatedTime":"<time>"}` },
+        { role: "user", content: `Subject: ${subject}, Topic: ${topic}, Learning Style: ${learningStyle}` }
       ]
     });
-    
     const raw = result.choices[0].message.content.replace(/```json|```/g, "").trim();
-    const data = JSON.parse(raw);
-    res.json({ success: true, ...data });
-    
+    res.json({ success: true, ...JSON.parse(raw) });
   } catch (e) {
     res.status(500).json({ error: "Failed to get recommendations." });
   }
 });
 
-// Student Progress Analyzer
-app.post('/api/progress', async (req, res) => {
+app.post('/api/learning/progress', async (req, res) => {
   const { studentName = "Student", subject, scores } = req.body;
-  
-  if (!scores || !Array.isArray(scores)) {
-    return res.status(400).json({ error: "scores array is required." });
-  }
-  
+  if (!scores || !Array.isArray(scores)) return res.status(400).json({ error: "scores array is required." });
   try {
     const result = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
-        { 
-          role: "system", 
-          content: `You are a student progress analyzer. Return ONLY valid JSON no markdown. Schema: {"overallProgress":"<percentage>","strongTopics":["<topic>"],"weakTopics":["<topic>"],"nextSteps":["<step>"],"motivationalMessage":"<message>"}` 
-        },
-        { 
-          role: "user", 
-          content: `Student: ${studentName}, Subject: ${subject}, Scores: ${JSON.stringify(scores)}` 
-        }
+        { role: "system", content: `You are a student progress analyzer. Return ONLY valid JSON no markdown. Schema: {"overallProgress":"<percentage>","strongTopics":["<topic>"],"weakTopics":["<topic>"],"nextSteps":["<step>"],"motivationalMessage":"<message>"}` },
+        { role: "user", content: `Student: ${studentName}, Subject: ${subject}, Scores: ${JSON.stringify(scores)}` }
       ]
     });
-    
     const raw = result.choices[0].message.content.replace(/```json|```/g, "").trim();
-    const data = JSON.parse(raw);
-    res.json({ success: true, ...data });
-    
+    res.json({ success: true, ...JSON.parse(raw) });
   } catch (e) {
     res.status(500).json({ error: "Failed to analyze progress." });
   }
