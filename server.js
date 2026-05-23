@@ -270,6 +270,40 @@ app.post('/api/attendance/analyze', async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+// ── PERFORMANCE PREDICTION ────────────────────────────────────────────────────
+app.post('/api/performance/predict', async (req, res) => {
+  try {
+    const { studentId, studentName, subject, historicalScores } = req.body;
+    const result = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'You are a student performance predictor. Return ONLY valid JSON no markdown. Schema: {"predictedScore":"<number>","predictedGrade":"<A/B/C/D/F>","riskOfFailing":true/false,"confidence":"<percentage>","trend":"improving/declining/stable","strengths":["<topic>"],"weaknesses":["<topic>"],"suggestions":["<suggestion>"],"message":"<summary>"}' },
+        { role: 'user', content: `Student: ${studentName}, ID: ${studentId}, Subject: ${subject}, Past Scores: ${JSON.stringify(historicalScores)}` }
+      ]
+    });
+    const raw = result.choices[0].message.content.replace(/```json|```/g, '').trim();
+    res.json({ success: true, studentId, studentName, subject, ...JSON.parse(raw) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+// ── SMART NOTIFICATIONS ───────────────────────────────────────────────────────
+app.post('/api/notify', async (req, res) => {
+  try {
+    const { userId, role, eventType, data } = req.body;
+    const result = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: 'You are a smart school notification system. Return ONLY valid JSON no markdown. Schema: {"title":"<title>","message":"<message>","priority":"low/medium/high","category":"<academic/attendance/fees/exam/general>","actionRequired":true/false,"suggestedAction":"<action>"}' },
+        { role: 'user', content: `User: ${userId}, Role: ${role}, Event: ${eventType}, Data: ${JSON.stringify(data)}` }
+      ]
+    });
+    const raw = result.choices[0].message.content.replace(/```json|```/g, '').trim();
+    res.json({ success: true, userId, ...JSON.parse(raw) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 app.listen(PORT, () => {
   console.log(`✅ Chatbot server running at http://localhost:${PORT}`);
 });
